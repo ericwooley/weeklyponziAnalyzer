@@ -6,11 +6,24 @@ var weeklyponzianalyzer = require('./');
 var cli = meow({
   help: [
     'Usage',
-    '  weeklyponzianalyzer <input>',
+    '  weeklyponzianalyzer --updateTime=(minutes)',
     '',
     'Example',
-    '  weeklyponzianalyzer Unicorn'
+    '  weeklyponzianalyzer --update=1 # update every minute'
   ].join('\n')
 });
+var running = true;
+weeklyponzianalyzer(cli.flags, function(){
+    running = false;
+});
 
-weeklyponzianalyzer(cli.flags);
+if(cli.flags.update){
+    setInterval(function(){
+        if(!running){
+            running = true;
+            weeklyponzianalyzer(cli.flags, function(){
+                running = false;
+            });    
+        }
+    }, cli.flags.update * 1000 * 60);
+}

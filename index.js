@@ -4,7 +4,13 @@ var Q = require('q');
 var _ = require('lodash-node');
 var request = require('request');
 var fs = require('fs');
-module.exports = function(options) {
+
+module.exports = function(options, done) {
+    function log(){
+        if(options.verbose){
+            console.log.apply(this, arguments);
+        }
+    }
     var renderTime = 1000;
     var Analyzer = function(ph, page, renderTime) {
         return {
@@ -13,19 +19,17 @@ module.exports = function(options) {
             initialize: function() {
                 var deferred = Q.defer();
                 page.set('onError', function(error) {
-                    console.log(error);
+                    log(error);
                     this.logError(error);
                 }.bind(this));
                 page.open('http://weeklyponzi.com/', function(status) {
-                    if (!options.json) {
-                        console.log('Opeing weeklyponzi...', status);
-                        console.log('waiting ' + renderTime + ' for page to render\n\n-----');
-                    }
+                        log('Opeing weeklyponzi...', status);
+                        log('waiting ' + renderTime + ' for page to render\n\n-----');
                     setTimeout(function() {
                         try{
                             this.report = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
                         } catch(e) {
-                            console.log('Error reading data', e);
+                            log('Error reading data', e);
                         }
                         deferred.resolve(this, this.ph, this.page);
                     }.bind(this), renderTime);
@@ -51,11 +55,15 @@ module.exports = function(options) {
 
                 link = link.replace('tx', 'tx-index') + '?format=json';
                 return Q.promise(function(resolve) {
-                    process.stdout.write('\r' + this.transactionsRetrieved+++'/' + this.transactionCount);
+                    if(!options.silent){
+                        
+                    }
                     if (this.report.transactionsIndex[txid]) {
                         resolve();
                     } else {
                         request.get(link, function(error, response, body) {
+                            this.transactionsRetrieved++;
+                            process.stdout.write('\r' + this.transactionsRetrieved+'/' + this.transactionCount);
                             this.report.transactions.push(JSON.parse(body));
                             this.report.transactionsIndex[txid] = true;
                             resolve();
@@ -71,7 +79,6 @@ module.exports = function(options) {
                 }.bind(this), new Q()).then(done);
             },
             getTransactions: function() {
-                console.log('start transactions');
                 var deferred = Q.defer();
                 this.page.evaluate(
                     function() {
@@ -84,7 +91,7 @@ module.exports = function(options) {
                     },
                     function(transactions) {
                         // for debugging
-                        // transactions = transactions.slice(0, 20);
+                        // transactions = transactions.slice(0, 25);
                         this.transactionCount = transactions.length;
                         this._writeResult('TransactionCount')(transactions.length);
 
@@ -99,10 +106,6 @@ module.exports = function(options) {
                         this.report.preText.push(result);
                     } else {
                         this.report[preText] = result;
-                    }
-
-                    if (!options.json) {
-                        console.log(preText, ':\t', result);
                     }
                     if (after) {
                         return after();
@@ -130,10 +133,13 @@ module.exports = function(options) {
                     return analyzer.getTransactions();
                 })
                 .then(function() {
+                    log('\r complete \n');
                     fs.writeFile('./data.json', JSON.stringify(analyzer.report, null, 5), 'utf-8');
-                    console.log(JSON.stringify(analyzer.report, null, 3));
                 })
-                .then(ph.exit);
+                .then(function(){
+                    ph.exit();
+                    done();
+                });
 
         }.bind(this));
     }.bind(this));
