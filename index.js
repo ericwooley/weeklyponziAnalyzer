@@ -17,6 +17,10 @@ var Analyzer = function(options) {
         },
         run: function() {
             return Q.promise(function(resolve) {
+                if(this.running === true){
+                    resolve(this.report);
+                }
+                this.running = true;
                 phantom.create(function(ph) {
                     ph.createPage(function(page) {
                         this.page = page;
@@ -40,6 +44,7 @@ var Analyzer = function(options) {
                                 }
                             }.bind(this))
                             .then(function() {
+                                this.running = false;
                                 ph.exit();
                                 resolve(this.report);
                             }.bind(this));
@@ -97,10 +102,20 @@ var Analyzer = function(options) {
                         process.stdout.write('\r Updating transactions: ' + this.transactionsRetrieved + '/' + this.transactionCount);
                         this.report.transactions.push(JSON.parse(body));
                         this.report.transactionsIndex[txid] = true;
+                        if(this.downdloadsSinceSave % 10 === 0){
+                            this.save();
+                        }
                         resolve();
                     }.bind(this));
                 }
             }.bind(this));
+        },
+        save: function(){
+            try {
+                fs.writeFile('./data.json', JSON.stringify(this.report, null, 5), 'utf-8');
+            } catch (e) {
+                console.log(e);
+            }
         },
         _downloadUrls: function(transactions, done) {
             return transactions.reduce(function(soFar, s) {
@@ -137,7 +152,6 @@ var Analyzer = function(options) {
                     // transactions = transactions.slice(0, 25);
                     this.transactionCount = transactions.length;
                     this._writeResult('TransactionCount')(transactions.length);
-
                     this._downloadUrls(transactions, deferred.resolve);
                 }.bind(this)
             );
@@ -163,4 +177,7 @@ var Analyzer = function(options) {
         }
     };
 };
-module.exports = Analyzer;
+var analyzer = new Analyzer();
+module.exports = function(){
+    return analyzer;
+};
