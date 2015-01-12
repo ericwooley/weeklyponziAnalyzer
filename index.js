@@ -20,7 +20,6 @@ var Analyzer = function(options) {
                     ph.createPage(function(page) {
                         this.page = page;
                         this.ph = ph;
-                        this.log('got to here');
                         try {
                             this.report = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
                             this.log('read report', this.report.transactions.length);
@@ -161,6 +160,7 @@ var Analyzer = function(options) {
         },
         _writeResult: function(preText, after) {
             return function(result) {
+                this.report.lastUpdated = new Date().now();
                 if (_.isArray(this.report.pretext)) {
                     this.report.preText.push(result);
                 } else {
@@ -171,7 +171,6 @@ var Analyzer = function(options) {
                 }
             }.bind(this);
         },
-
         report: {
             errors: [],
             transactions: [],
