@@ -4,27 +4,30 @@ var Q = require('q');
 var _ = require('lodash-node');
 var request = require('request');
 var fs = require('fs');
-
 var Analyzer = function(options) {
     options = options || {};
     var renderTime = 1000;
     return {
         options: options,
         log: function() {
-            if (options.verbose) {
+            if (this.options.verbose) {
                 console.log.apply(this, arguments);
             }
         },
         run: function() {
             return Q.promise(function(resolve) {
-                if(this.running === true){
-                    resolve(this.report);
-                }
-                this.running = true;
                 phantom.create(function(ph) {
                     ph.createPage(function(page) {
                         this.page = page;
                         this.ph = ph;
+                        this.log('got to here');
+                        try {
+                            this.report = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
+                            this.log('read report', this.report.transactions.length);
+                        } catch (e) {
+                            this.log('Error reading data', e);
+                        }
+                        console.log('then to hre');
                         this.initialize()
                             .then(function() {
                                 return this.getTimeLeft();
@@ -36,11 +39,11 @@ var Analyzer = function(options) {
                                 return this.getTransactions();
                             }.bind(this))
                             .then(function() {
-                                this.log('\r complete \n');
+                                    this.log('\r complete \n');
                                 try {
                                     fs.writeFile('./data.json', JSON.stringify(this.report, null, 5), 'utf-8');
                                 } catch (e) {
-                                    console.log(e);
+                                    console.error(e);
                                 }
                             }.bind(this))
                             .then(function() {
@@ -62,12 +65,8 @@ var Analyzer = function(options) {
                 this.log('Opeing weeklyponzi...', status);
                 this.log('waiting ' + renderTime + ' for page to render\n\n-----');
                 setTimeout(function() {
-                    try {
-                        this.report = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
-                    } catch (e) {
-                        this.log('Error reading data', e);
-                    }
-                    deferred.resolve(this, this.ph, this.page);
+
+                    deferred.resolve();
                 }.bind(this), renderTime);
             }.bind(this));
             return deferred.promise;
@@ -91,18 +90,17 @@ var Analyzer = function(options) {
 
             link = link.replace('tx', 'tx-index') + '?format=json';
             return Q.promise(function(resolve) {
-                if (!options.silent) {
-
-                }
                 if (this.report.transactionsIndex[txid]) {
                     resolve();
                 } else {
                     request.get(link, function(error, response, body) {
                         this.transactionsRetrieved++;
-                        process.stdout.write('\r Updating transactions: ' + this.transactionsRetrieved + '/' + this.transactionCount);
+                        if (this.options.verbose) {
+                            process.stdout.write('\r Updating transactions: ' + this.transactionsRetrieved + '/' + this.transactionCount);
+                        }
                         this.report.transactions.push(JSON.parse(body));
                         this.report.transactionsIndex[txid] = true;
-                        if(this.downdloadsSinceSave % 10 === 0){
+                        if (this.downdloadsSinceSave % 10 === 0) {
                             this.save();
                         }
                         resolve();
@@ -110,8 +108,9 @@ var Analyzer = function(options) {
                 }
             }.bind(this));
         },
-        save: function(){
+        save: function() {
             try {
+                this.log('saving', JSON.stringify(this.report, null, 5));
                 fs.writeFile('./data.json', JSON.stringify(this.report, null, 5), 'utf-8');
             } catch (e) {
                 console.log(e);
@@ -128,7 +127,7 @@ var Analyzer = function(options) {
             var deferred = Q.defer();
             this.page.evaluate(
                 function() {
-                    return document.querySelector('body > div > div.jumbotron.text-center > div > a > strong').innerHTML;
+                    return document.querySelector('body > div > div.jumbotron.text-center > div > a > strong').innerText;
                 },
                 function(address) {
                     this._writeResult('payinAddress', deferred.resolve)(address);
@@ -149,7 +148,10 @@ var Analyzer = function(options) {
                 },
                 function(transactions) {
                     // for debugging
-                    // transactions = transactions.slice(0, 25);
+                    if(this.options.debug){
+                        transactions = transactions.slice(0, 25);    
+                    }
+                    
                     this.transactionCount = transactions.length;
                     this._writeResult('TransactionCount')(transactions.length);
                     this._downloadUrls(transactions, deferred.resolve);
@@ -177,7 +179,4 @@ var Analyzer = function(options) {
         }
     };
 };
-var analyzer = new Analyzer();
-module.exports = function(){
-    return analyzer;
-};
+module.exports = Analyzer;
