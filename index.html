@@ -1,0 +1,62 @@
+<head>
+   <script type="text/javascript"
+          src="https://www.google.com/jsapi?autoload={
+            'modules':[{
+              'name':'visualization',
+              'version':'1',
+              'packages':['corechart']
+            }]
+          }"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js" ></script>
+</head>
+<body>
+  <div id="curve_chart" style="width: 2000px; height: 90%"></div>
+  <script type="text/javascript">
+  'use strict';
+  /* global google */
+  function drawChart(data) {
+    var minX = data[1][0];
+      data = google.visualization.arrayToDataTable(data);
+      console.log(data);
+
+      var options = {
+          title: 'Weekly Ponzy Analyzation',
+          // curveType: 'function',
+          legend: {
+              position: 'bottom'
+          },
+          vAxis: {title:'Satoshis (total / 200)',minValue:0},
+          hAxis: {title:'unix timestamp', minValue: minX}
+      };
+
+      var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
+
+      chart.draw(data, options);
+  }
+  /* global $ */
+  /* global _ */
+  $(document).ready(function(){
+    $.ajax('/data.json').then(function(response){
+      var total = 0;
+      var rawdata = _.sortBy(response.transactions, function(obj){
+        return obj.time;
+      });
+      var data = [[
+        'timestamp', 'Satoshis', 'total'
+      ]];
+      _.each(rawdata, function(tx) {
+          var properOut = _.find(tx.out, function(obj) {
+              return obj.addr === '1Week8mnAJwgaW5xJoBZo1UfhE8LYVJYk';
+          });
+          var value = properOut.value;
+          total = (value / 200) + total;
+          data.push([tx.time, value, total]);
+      }.bind(this));
+      drawChart(data);
+      
+    });
+    
+  });
+  </script>
+</body>
