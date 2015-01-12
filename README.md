@@ -15,7 +15,11 @@ $ npm install --save weeklyponzianalyzer
 ```js
 var weeklyponzianalyzer = require('weeklyponzianalyzer');
 
-weeklyponzianalyzer('Rainbow');
+var options = {
+    verbose: true,
+    
+}
+weeklyponzianalyzer(options);
 ```
 
 ```sh

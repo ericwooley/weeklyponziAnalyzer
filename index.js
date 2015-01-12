@@ -5,16 +5,16 @@ var _ = require('lodash-node');
 var request = require('request');
 var fs = require('fs');
 
-
-
 var Analyzer = function(options) {
-    function log() {
-        if (options.verbose) {
-            console.log.apply(this, arguments);
-        }
-    }
+    options = options || {};
     var renderTime = 1000;
     return {
+        options: options,
+        log: function() {
+            if (options.verbose) {
+                console.log.apply(this, arguments);
+            }
+        },
         run: function() {
             return Q.promise(function(resolve) {
                 phantom.create(function(ph) {
@@ -32,10 +32,10 @@ var Analyzer = function(options) {
                                 return this.getTransactions();
                             }.bind(this))
                             .then(function() {
-                                log('\r complete \n');
+                                this.log('\r complete \n');
                                 try {
                                     fs.writeFile('./data.json', JSON.stringify(this.report, null, 5), 'utf-8');
-                                } catch(e){
+                                } catch (e) {
                                     console.log(e);
                                 }
                             }.bind(this))
@@ -50,17 +50,17 @@ var Analyzer = function(options) {
         initialize: function() {
             var deferred = Q.defer();
             this.page.set('onError', function(error) {
-                log(error);
+                this.log(error);
                 this.logError(error);
             }.bind(this));
             this.page.open('http://weeklyponzi.com/', function(status) {
-                log('Opeing weeklyponzi...', status);
-                log('waiting ' + renderTime + ' for page to render\n\n-----');
+                this.log('Opeing weeklyponzi...', status);
+                this.log('waiting ' + renderTime + ' for page to render\n\n-----');
                 setTimeout(function() {
                     try {
                         this.report = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
                     } catch (e) {
-                        log('Error reading data', e);
+                        this.log('Error reading data', e);
                     }
                     deferred.resolve(this, this.ph, this.page);
                 }.bind(this), renderTime);
@@ -94,7 +94,7 @@ var Analyzer = function(options) {
                 } else {
                     request.get(link, function(error, response, body) {
                         this.transactionsRetrieved++;
-                        process.stdout.write('\r' + this.transactionsRetrieved + '/' + this.transactionCount);
+                        process.stdout.write('\r Updating transactions: ' + this.transactionsRetrieved + '/' + this.transactionCount);
                         this.report.transactions.push(JSON.parse(body));
                         this.report.transactionsIndex[txid] = true;
                         resolve();
