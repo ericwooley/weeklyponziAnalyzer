@@ -128,7 +128,7 @@ var Analyzer = function(options) {
             var deferred = Q.defer();
             this.page.evaluate(
                 function() {
-                    return document.querySelector('body > div > div.jumbotron.text-center > div > a > strong').innerText;
+                    return document.querySelector('body > div > div.jumbotron.text-center > div > a > strong').innerHTML;
                 },
                 function(address) {
                     this._writeResult('payinAddress', deferred.resolve)(address);
