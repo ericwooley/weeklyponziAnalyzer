@@ -24,9 +24,8 @@ var Analyzer = function(options) {
                             this.report = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
                             this.log('read report', this.report.transactions.length);
                         } catch (e) {
-                            this.log('Error reading data', e);
+                            console.log('Error reading data', e);
                         }
-                        console.log('then to hre');
                         this.initialize()
                             .then(function() {
                                 return this.getTimeLeft();
@@ -146,11 +145,9 @@ var Analyzer = function(options) {
                     return urls;
                 },
                 function(transactions) {
-                    // for debugging
                     if(this.options.debug){
                         transactions = transactions.slice(0, 25);    
                     }
-                    
                     this.transactionCount = transactions.length;
                     this._writeResult('TransactionCount')(transactions.length);
                     this._downloadUrls(transactions, deferred.resolve);
@@ -160,7 +157,7 @@ var Analyzer = function(options) {
         },
         _writeResult: function(preText, after) {
             return function(result) {
-                this.report.lastUpdated = new Date().now();
+                this.report.lastUpdated = new Date();
                 if (_.isArray(this.report.pretext)) {
                     this.report.preText.push(result);
                 } else {
