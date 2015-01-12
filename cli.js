@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 var meow = require('meow');
-var weeklyponzianalyzer = require('./');
+var Weeklyponzianalyzer = require('./');
 
 var cli = meow({
   help: [
@@ -13,7 +13,7 @@ var cli = meow({
   ].join('\n')
 });
 var running = true;
-weeklyponzianalyzer(cli.flags, function(){
+new Weeklyponzianalyzer(cli.flags).run().then(function(){
     running = false;
 });
 
@@ -21,7 +21,7 @@ if(cli.flags.update){
     setInterval(function(){
         if(!running){
             running = true;
-            weeklyponzianalyzer(cli.flags, function(){
+            new Weeklyponzianalyzer(cli.flags).run().then(function(){
                 running = false;
             });    
         }
