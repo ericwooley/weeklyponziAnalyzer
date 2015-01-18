@@ -23,7 +23,7 @@ if(cli.flags.update){
             running = true;
             new Weeklyponzianalyzer(cli.flags).run().then(function(){
                 running = false;
-            });    
+            });
         }
     }, cli.flags.update * 1000 * 60);
 }
