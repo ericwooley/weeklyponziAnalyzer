@@ -96,7 +96,9 @@ var Analyzer = function(options) {
                         if (this.options.verbose) {
                             process.stdout.write('\r Updating transactions: ' + this.transactionsRetrieved + '/' + this.transactionCount);
                         }
-                        this.report.transactions.push(JSON.parse(body));
+			var tx = JSON.parse(body);
+			this_trimTransaction(tx);
+                        this.report.transactions.push(tx);
                         this.report.transactionsIndex[txid] = true;
                         if (this.downdloadsSinceSave % 10 === 0) {
                             this.save();
@@ -106,6 +108,22 @@ var Analyzer = function(options) {
                 }
             }.bind(this));
         },
+	_trimTransaction: function(tx){
+		delete tx.double_spend;
+		delete tx.ver;
+		delete tx.inputs;
+		delete tx.lock_time;
+		delete tx.relayed_by;
+		delete tx.size;
+		delete tx.vin_sz;
+		delete tx.vout_sz;
+		for(var i = 0; i < tx.out.length; i++){
+			var obj = tx.out[0];
+			delete obj.n;
+			delete obj.spent;
+			delete obj.script;
+		}
+	},
         save: function() {
             try {
                 this.log('saving', JSON.stringify(this.report, null, 5));
