@@ -27,31 +27,25 @@ var Analyzer = function(options) {
             } catch (e) {
               console.log('Error reading data', e);
             }
-            this.initialize()
-              .then(function() {
-                return this.getTimeLeft();
-              }.bind(this))
-              .then(function() {
-                return this.getPayoutAddress();
-              }.bind(this))
-              .then(function() {
-                return this.getTransactions();
-              }.bind(this))
-              .then(function() {
-                this.log('\r complete \n');
-                try {
-                  fs.writeFile('./data.json', JSON.stringify(
-                    this.report, null,
-                    5), 'utf-8');
-                } catch (e) {
-                  console.error(e);
-                }
-              }.bind(this))
-              .then(function() {
-                this.running = false;
-                ph.exit();
-                resolve(this.report);
-              }.bind(this));
+            this.initialize().then(function() {
+              return this.getTimeLeft();
+            }.bind(this)).then(function() {
+              return this.getPayoutAddress();
+            }.bind(this)).then(function() {
+              return this.getTransactions();
+            }.bind(this)).then(function() {
+              this.log('\r complete \n');
+              try {
+                fs.writeFile('./data.json', JSON.stringify(
+                  this.report, null, 5), 'utf-8');
+              } catch (e) {
+                console.error(e);
+              }
+            }.bind(this)).then(function() {
+              this.running = false;
+              ph.exit();
+              resolve(this.report);
+            }.bind(this));
           }.bind(this));
         }.bind(this));
       }.bind(this));
@@ -67,7 +61,6 @@ var Analyzer = function(options) {
         this.log('waiting ' + renderTime +
           ' for page to render\n\n-----');
         setTimeout(function() {
-
           deferred.resolve();
         }.bind(this), renderTime);
       }.bind(this));
@@ -79,18 +72,15 @@ var Analyzer = function(options) {
           /* global document */
           function() {
             return document.querySelector('#countdown1').innerHTML;
-          },
-          this._writeResult('TimeLeft', resolve)
-        );
+          }, this._writeResult('TimeLeft', resolve));
       }.bind(this));
     },
     logError: function(log) {
       this.report.errors.push(log);
     },
     transactionsRetrieved: 0,
-    _getTransactionInfo: function(link) {
+    _getTransactionInfo: function(link, status) {
       var txid = link.replace('http://www.blockchain.info/tx/', '');
-
       link = link.replace('tx', 'tx-index') + '?format=json';
       return Q.promise(function(resolve) {
         if (this.report.transactionsIndex[txid]) {
@@ -100,14 +90,14 @@ var Analyzer = function(options) {
             this.transactionsRetrieved++;
             if (this.options.verbose) {
               process.stdout.write('\r Updating transactions: ' +
-                this.transactionsRetrieved +
-                '/' + this.transactionCount);
+                this.report.transactions.length + '/' + this.transactionCount
+              );
             }
             var tx = JSON.parse(body);
             this._trimTransaction(tx);
             this.report.transactions.push(tx);
-            this.report.transactionsIndex[txid] = true;
-            if (this.downdloadsSinceSave % 10 === 0) {
+            this.report.transactionsIndex[txid] = status;
+            if (this.transactionsRetrieved % 10 === 0) {
               this.save();
             }
             resolve();
@@ -133,9 +123,9 @@ var Analyzer = function(options) {
     },
     save: function() {
       try {
-        this.log('saving', JSON.stringify(this.report, null, 5));
         fs.writeFile('./data.json', JSON.stringify(this.report, null, 5),
           'utf-8');
+        this.log('saving');
       } catch (e) {
         console.log(e);
       }
@@ -143,45 +133,47 @@ var Analyzer = function(options) {
     _downloadUrls: function(transactions, done) {
       return transactions.reduce(function(soFar, s) {
         return soFar.then(function() {
-          return this._getTransactionInfo(s);
+          return this._getTransactionInfo(s.link, s.status);
         }.bind(this));
       }.bind(this), new Q()).then(done);
     },
     getPayoutAddress: function() {
       var deferred = Q.defer();
-      this.page.evaluate(
-        function() {
-          return document.querySelector(
-            'body > div > div.jumbotron.text-center > div > a > strong'
-          ).innerText;
-        },
-        function(address) {
-          this._writeResult('payinAddress', deferred.resolve)(address);
-        }.bind(this)
-      );
+      this.page.evaluate(function() {
+        return document.querySelector(
+          'body > div > div.jumbotron.text-center > div > a > strong'
+        ).innerText;
+      }, function(address) {
+        this._writeResult('payinAddress', deferred.resolve)(address);
+      }.bind(this));
       return deferred.promise;
     },
     getTransactions: function() {
       var deferred = Q.defer();
-      this.page.evaluate(
-        function() {
-          var links = document.querySelectorAll(
-            'table:nth-child(3) tr td:nth-child(4) > a');
-          var urls = [];
-          for (var i = links.length - 1; i >= 0; i--) {
-            urls.push(links[i].getAttribute('href'));
+      this.page.evaluate(function() {
+        var rows = document.querySelectorAll('table:nth-child(3) tr');
+        var data = [];
+        for (var i = rows.length - 1; i >= 0; i--) {
+          var row = rows[i];
+          var link = row.querySelector('td:nth-child(4) > a');
+          if(link) {
+            var url = link.getAttribute('href');
+            var status = row.querySelector('td:nth-child(5)').innerHTML;
+            data.push({
+              status: status,
+              link: url
+            });
           }
-          return urls;
-        },
-        function(transactions) {
-          if (this.options.debug) {
-            transactions = transactions.slice(0, 25);
-          }
-          this.transactionCount = transactions.length;
-          this._writeResult('TransactionCount')(transactions.length);
-          this._downloadUrls(transactions, deferred.resolve);
-        }.bind(this)
-      );
+        }
+        return data;
+      }, function(transactions) {
+        if (this.options.debug) {
+          transactions = transactions.slice(0, 25);
+        }
+        this.transactionCount = transactions.length;
+        this._writeResult('TransactionCount')(transactions.length);
+        this._downloadUrls(transactions, deferred.resolve);
+      }.bind(this));
       return deferred.promise;
     },
     _writeResult: function(preText, after) {
